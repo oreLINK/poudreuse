@@ -35,6 +35,18 @@
     </div>
   </div>
 
+  <div class="filtres panel" id="filtres" role="group" aria-label="Filtres d'affichage" hidden>
+    <p class="filtres-title">Filtres</p>
+    <label class="switch">
+      <input type="checkbox" role="switch" id="filtre-topo">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="switch-text">
+        <strong>Topographie</strong>
+        <span>Courbes de niveau tous les 10 m, marquées tous les 100 m · touche T</span>
+      </span>
+    </label>
+  </div>
+
   <div class="dock panel" role="toolbar" aria-label="Commandes">
     <div class="group">
       <button class="icon" id="rotL" aria-label="Tourner vers la gauche">⟲</button>
@@ -54,6 +66,11 @@
         </svg>
       </button>
     </div>
+    <button class="icon" id="filtres-btn" aria-haspopup="true" aria-expanded="false" aria-controls="filtres" aria-label="Filtres d'affichage" title="Filtres">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+        <path d="M12 4 3 8.5 12 13l9-4.5z"/><path d="m3 12.5 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/>
+      </svg>
+    </button>
     <span class="sep"></span>
     <div class="sizes" id="sizes" role="group" aria-label="Taille du massif">
       <button data-size="petit">Petit</button>

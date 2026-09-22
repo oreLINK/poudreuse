@@ -44,6 +44,7 @@ src/
     construction.ts       contrôle des emplacements et registre des bâtiments
   ui/
     construction.ts       mode construction (icône, pose, confirmation)
+    filtres.ts            menu des filtres (courbes de niveau)
   sim/
     meteo.ts              vent : épisodes de calme, rafales localisées, vent soutenu
   gen/                    génération : données pures, sans Three.js

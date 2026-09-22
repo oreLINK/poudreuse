@@ -11,6 +11,7 @@ import { Stage } from './render/stage';
 import { World } from './render/world';
 import { Meteo } from './sim/meteo';
 import { ModeConstruction } from './ui/construction';
+import { MenuFiltres } from './ui/filtres';
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -18,6 +19,9 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as
 const stage = new Stage($('#scene'), reduceMotion);
 const day = new DayCycle(stage.sun, stage.hemi, stage.fog);
 const construction = new ModeConstruction(stage, $('#scene'));
+const filtres = new MenuFiltres(reduceMotion);
+// un seul panneau à la fois au-dessus du dock
+document.querySelectorAll('[data-batiment]').forEach(b => b.addEventListener('click', () => filtres.ouvrir(false)));
 let world: World | null = null;
 let meteo: Meteo | null = null;
 
@@ -79,6 +83,7 @@ function loop(now: number) {
   if (!reduceMotion) { shared.time.value += dt; day.advance(dt); meteo?.update(dt); }
   day.apply(world, reduceMotion ? TEMPS.phaseFigee : day.phase);
   stage.update(dt);
+  filtres.update(dt);
   needle.style.transform = `rotate(${stage.northAngle()}deg)`;
   if (world?.spindrift && meteo && !reduceMotion) world.spindrift.update(dt, 2.2 * stage.renderer.getPixelRatio() * Math.sqrt(stage.zoom), meteo);
   stage.render();

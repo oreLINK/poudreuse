@@ -21,3 +21,26 @@ export const OBJETS = {
 
 /** Diamètre moyen d'un arbre affiché, en mètres au sol. */
 export const ARBRE_M = OBJETS.arbre * OBJETS.echelle * ECHELLE.UNIT;
+
+/** Filtre topographique : courbes de niveau dessinées sur le relief. */
+export const TOPO = {
+  /** Écart d'altitude (m) entre deux courbes. */
+  equidistance: 10,
+  /** Une courbe maîtresse, plus marquée, toutes les N mètres. */
+  maitresse: 100,
+  /** Orange léger. */
+  couleur: '#f5b574',
+  /** Intensité des courbes ordinaires et des courbes maîtresses (0–1). */
+  opacite: 0.5,
+  opaciteMaitresse: 0.7,
+  /** Épaisseur (pixels écran). */
+  epaisseur: 1,
+  epaisseurMaitresse: 1.5,
+  /** Écart minimal (pixels) entre deux courbes : en dessous, elles s'estompent pour ne pas former d'aplat (elles reviennent en zoomant). */
+  ecartMin: 9,
+  /** Au-dessous de cet écart (pixels), les courbes maîtresses s'allègent jusqu'à `vueEnsemble` × leur intensité. */
+  ecartConfort: 40,
+  vueEnsemble: 0.35,
+  /** Durée (s) du fondu à l'activation. */
+  fondu: 0.25,
+};

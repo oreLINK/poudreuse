@@ -71,6 +71,7 @@ src/
     meteo.ts                vent : enchaînement des épisodes, rafales localisées, intensité en un point
   ui/
     construction.ts         mode construction : icône → aperçu au survol → clic → Confirmer
+    filtres.ts              menu « Filtres » : filtre topographique (courbes de niveau)
   gen/                      GÉNÉRATION : données pures, AUCUNE dépendance à Three.js
     math.ts                 aléatoire déterministe (mulberry32), bruit de Perlin, smooth/smin/smax
     types.ts                types Domain, Valley, Network, RiverPoint
@@ -86,7 +87,7 @@ src/
     terrainView.ts          conversions grille ↔ 3D, lectures du relief (via gen/sol.ts), convexité, pick() du point visé
     stage.ts                renderer, lumières, caméra isométrique, navigation
     world.ts                assemble la scène d'un domaine, dispose()
-    terrain.ts              terrain à facettes + socle du diorama
+    terrain.ts              terrain à facettes + socle du diorama ; courbes de niveau dans le shader (onBeforeCompile)
     water.ts                lacs gelés + torrents (rubans animés)
     vegetation.ts           pins, mélèzes, arbres englacés (InstancedMesh) ; abattre() sous un bâtiment
     relief.ts               corniches + traces de freeride
@@ -239,7 +240,10 @@ L'interface est volontairement **minimale**. Le porteur a explicitement demandé
 - la lecture des données de case au survol ;
 - le panneau de profil du domaine (statistiques de pentes).
 
-**Seuls restent** : pivoter à gauche / à droite, la boussole, **l'icône de construction (maisonnette)**, le choix de taille (Petit / Moyen / Grand / Immense) et le bouton « Nouveau massif ». Ne pas rajouter d'éléments d'interface sans demande.
+**Seuls restent** : pivoter à gauche / à droite, la boussole, **l'icône de construction (maisonnette)**, **le bouton « Filtres »**, le choix de taille (Petit / Moyen / Grand / Immense) et le bouton « Nouveau massif ». Ne pas rajouter d'éléments d'interface sans demande.
+
+**Filtres** (demande du porteur, 22/09/2026) : le bouton « Filtres » (icône de calques) ouvre un menu au-dessus du dock, avec un interrupteur par filtre. Fermeture par Échap ou clic ailleurs ; le bouton porte un liseré orange quand un filtre est actif. Le choix est retenu dans `localStorage` (confort personnel, optionnel).
+- **Topographie** (touche T) : courbes de niveau **orange léger** (`#f5b574`) tous les **10 m**, marquées tous les **100 m**. Calculées au pixel dans le shader du terrain (épaisseur constante à tous les zooms, aucune géométrie ajoutée, fondu de 0,25 s). Quand les courbes se serrent à moins de 9 px (parois, vue d'ensemble), les courbes de 10 m s'effacent, puis les maîtresses ; en vue d'ensemble, les maîtresses sont allégées (35 %) pour que la carte ne soit pas couverte de bandes orange. Les courbes reviennent en zoomant. Réglages : `TOPO` dans `params/affichage.ts`. Pas de chiffres d'altitude affichés.
 
 **Construction** (demande du porteur, 22/09/2026) : cliquer sur l'icône du bâtiment, le placer sur la carte, puis confirmer.
 - Survol (souris) : un **bâtiment fantôme** translucide suit le pointeur, posé sur une grille de **cases vertes / rouges** (2 cases par arbre de côté ; 6 × 4 pour la maisonnette) visibles à travers lui. Le bâtiment s'aligne sur cette grille.
@@ -289,6 +293,7 @@ Tout changement de paramètres du générateur doit garder ces tests au vert. R�
 - Tester le site de production nécessite un serveur HTTP (`npm run preview`) : les workers modules ne fonctionnent pas en `file://`.
 - **`.github/workflows/deploy.yml` est absent** alors que le README et la section 2 le décrivent : à recréer avant le premier déploiement.
 - **`.gitignore`** : ignore `node_modules/`, `dist/`, caches (Vite, Vitest, TypeScript), journaux, `.env`, fichiers macOS et iCloud (`*.icloud` : le projet est dans iCloud Drive), réglages d'éditeur et `.claude/settings.local.json`. `package-lock.json` et `CLAUDE.md` restent versionnés. iCloud peut créer des copies en conflit (« fichier 2.ts ») : elles ne sont pas ignorées exprès, pour qu'elles se voient dans `git status`.
+- Uniforme partagé `shared.topo` (0–1) : visibilité du filtre topographique, animée par `ui/filtres.ts`. Le shader du terrain reconstruit l'altitude en mètres depuis `position.y` (`y / VEX × UNIT + ALT0`) : à garder cohérent si l'échelle change.
 - Styles : `[hidden] { display: none !important; }` est nécessaire, sinon un `display: flex` écrase l'attribut `hidden` (la barre de confirmation s'affichait au chargement).
 - Le `Domain` a changé (`station` remplace `village` et `refuges`) : toute future sauvegarde devra stocker la version du générateur.
 - Capture d'écran automatisée : `chrome --headless --screenshot` capture avant la fin du worker. Passer par le protocole DevTools (ouvrir la page, attendre ~25 s en temps réel sous SwiftShader, puis `Page.captureScreenshot`) ; `Input.dispatchMouseEvent` permet de simuler survol, clic, glisser et molette pour tester la construction.
@@ -331,7 +336,7 @@ Demande du porteur : un fichier de paramétrage par thème du jeu. Règles :
 | `vegetation.ts` | limite de la forêt, écart ubac, irrégularité, pente max, lisière autour de la station, densité |
 | `amenagement.ts` | `STATION` : rayon et nombre de sites comparés par taille, talus, pente dans le sens naturel, dévers, distance au bord |
 | `batiments.ts` | `BATIMENTS` (nom, emprise et hauteurs en arbres, pente max), `CONSTRUCTION` (cases par arbre, marge d'abattage) |
-| `affichage.ts` | `CAMERA` (zoom initial / min / max, molette), `OBJETS` (échelle, diamètre d'un arbre), `ARBRE_M` |
+| `affichage.ts` | `CAMERA` (zoom initial / min / max, molette), `OBJETS` (échelle, diamètre d'un arbre), `ARBRE_M`, `TOPO` (équidistance, courbes maîtresses, couleur, intensités, épaisseurs, écart minimal, allègement en vue d'ensemble, fondu) |
 
 ### Le vent (sim/meteo.ts)
 
@@ -350,3 +355,4 @@ Règle permanente (voir `CLAUDE.md`) : à chaque ajout, suppression ou modificat
 - **22/09/2026** : tailles décalées d'un cran (nouveau Petit 12,7 km, Moyen par défaut = ancien Petit, ancien Immense supprimé), `rang` de taille ; zoom initial 1,4 et objets × 1,4 ; création de `src/params/` (8 thèmes) remplaçant `gen/config.ts` ; vent par épisodes (calme / rafales localisées / soutenu) dans `src/sim/meteo.ts`, neige soufflée pilotée par le vent ; barres rocheuses sur nervures convexes et faces des pics creusées (fin de l'effet « toits en neige ») ; tests étendus au Petit + `tests/meteo.test.ts` ; ajout de `CLAUDE.md` ; corrections : Vitest 5, absence de `deploy.yml` et de `.gitignore` signalée.
 - **22/09/2026 (2)** : aire de station plate unique par carte, proportionnelle à la taille (700 / 950 / 1 250 / 1 600 m de rayon), sur la partie la plus basse (Petit) ou l'une des plus basses (autres), paramétrée dans `STATION` ; suppression du village, du clocher et des refuges (`Domain.village` / `refuges` → `Domain.station`, `render/settlements.ts` supprimé) ; construction de la **maisonnette** (3 × 2 arbres) : icône, aperçu fantôme + cases vertes / rouges, pose, rotation, confirmation, abattage des arbres (`jeu/construction.ts`, `render/batiments.ts`, `ui/construction.ts`, `params/batiments.ts`) ; lectures du sol mutualisées dans `gen/sol.ts` ; visée du terrain par `TerrainView.pick` ; trouée de la mer de nuages au-dessus de la station ; contraste des boutons actifs en thème sombre corrigé ; tests : aire de station (4 tailles) + `construction.test.ts` (44 tests).
 - **22/09/2026 (3)** : ajout du `.gitignore`.
+- **22/09/2026 (4)** : menu « Filtres » avec filtre topographique (courbes de niveau orange léger tous les 10 m, maîtresses tous les 100 m, touche T), paramètres `TOPO`.

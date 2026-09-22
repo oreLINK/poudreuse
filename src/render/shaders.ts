@@ -4,6 +4,8 @@ import * as THREE from 'three';
 export const shared = {
   time: { value: 0 },
   light: { value: new THREE.Color(1, 1, 1) },
+  /** Visibilité du filtre topographique (0 = masqué, 1 = affiché). */
+  topo: { value: 0 },
 };
 
 export const GLSL_NOISE = /* glsl */ `

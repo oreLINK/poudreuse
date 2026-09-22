@@ -1,7 +1,10 @@
 // Terrain à facettes et socle du diorama.
 import * as THREE from 'three';
 import { clamp, makeNoise, rng } from '../gen/math';
+import { TOPO } from '../params/affichage';
+import { ECHELLE } from '../params/monde';
 import { NEIGE } from '../params/neige';
+import { shared } from './shaders';
 import { C } from './palette';
 import type { TerrainView } from './terrainView';
 
@@ -80,9 +83,44 @@ export function buildTerrain(tv: TerrainView, seed: number): THREE.Mesh {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const mesh = new THREE.Mesh(g, topoMaterial());
   mesh.castShadow = mesh.receiveShadow = true;
   return mesh;
+}
+
+/**
+ * Matériau du relief avec le filtre topographique : courbes de niveau tous les TOPO.equidistance mètres,
+ * calculées au pixel (épaisseur constante à tous les zooms). Là où les courbes ordinaires se serreraient
+ * au point de former un aplat (parois), elles s'effacent et seules les maîtresses restent.
+ */
+function topoMaterial() {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTopo = shared.topo;
+    sh.uniforms.uTopoColor = { value: new THREE.Color(TOPO.couleur) };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vAltM;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vAltM = position.y / ${ECHELLE.VEX.toFixed(4)} * ${ECHELLE.UNIT.toFixed(1)} + ${ECHELLE.ALT0.toFixed(1)};`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vAltM; uniform float uTopo; uniform vec3 uTopoColor;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (uTopo > 0.001) {
+          float fw = max(fwidth(vAltM), 1e-4);
+          // distance (en pixels) à la courbe la plus proche
+          float dMin = abs(fract(vAltM / ${TOPO.equidistance.toFixed(1)} + .5) - .5) * ${TOPO.equidistance.toFixed(1)} / fw;
+          float dMaj = abs(fract(vAltM / ${TOPO.maitresse.toFixed(1)} + .5) - .5) * ${TOPO.maitresse.toFixed(1)} / fw;
+          float minor = (1. - smoothstep(${(TOPO.epaisseur / 2).toFixed(2)}, ${(TOPO.epaisseur / 2 + 1).toFixed(2)}, dMin))
+                      * (1. - smoothstep(${(1 / TOPO.ecartMin).toFixed(3)}, ${(2 / TOPO.ecartMin).toFixed(3)}, fw / ${TOPO.equidistance.toFixed(1)}));   // courbes trop serrées : effacées
+          float major = (1. - smoothstep(${(TOPO.epaisseurMaitresse / 2).toFixed(2)}, ${(TOPO.epaisseurMaitresse / 2 + 1).toFixed(2)}, dMaj))
+                      * (1. - smoothstep(${(1 / TOPO.ecartMin).toFixed(3)}, ${(2 / TOPO.ecartMin).toFixed(3)}, fw / ${TOPO.maitresse.toFixed(1)}))
+                      // vue d'ensemble : les maîtresses se rapprochent, on les allège pour garder une carte légère
+                      * (1. - ${(1 - TOPO.vueEnsemble).toFixed(2)} * smoothstep(${(1 / TOPO.ecartConfort).toFixed(4)}, ${(1 / TOPO.ecartMin).toFixed(4)}, fw / ${TOPO.maitresse.toFixed(1)}));
+          float a = max(minor * ${TOPO.opacite.toFixed(2)}, major * ${TOPO.opaciteMaitresse.toFixed(2)}) * uTopo;
+          diffuseColor.rgb = mix(diffuseColor.rgb, uTopoColor, a);
+        }`);
+  };
+  return m;
 }
 
 export function buildSkirt(tv: TerrainView): THREE.Mesh {
