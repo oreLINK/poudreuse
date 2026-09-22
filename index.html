@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Poudreuse</title>
+  <meta name="description" content="Poudreuse : gestion de station de ski en 3D isométrique, sur des massifs générés procéduralement.">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="scene" aria-label="Domaine skiable en 3D isométrique"></div>
+
+  <div class="brand">
+    <h1>Poudreuse</h1>
+    <div class="pistes" aria-hidden="true">
+      <span style="background:var(--green)"></span><span style="background:var(--blue)"></span>
+      <span style="background:var(--red)"></span><span style="background:var(--black)"></span>
+    </div>
+  </div>
+
+  <div class="loading" id="loading" aria-live="polite"><span class="panel">Génération du domaine…</span></div>
+
+  <div class="confirm panel" id="confirm" role="group" aria-label="Construction" hidden>
+    <div class="confirm-text">
+      <strong id="confirm-title">Maisonnette</strong>
+      <span id="confirm-hint" aria-live="polite"></span>
+    </div>
+    <div class="group">
+      <button class="icon" id="confirm-rot" aria-label="Tourner le bâtiment (R)" title="Tourner (R)">⤾</button>
+      <button id="confirm-cancel" title="Échap">Annuler</button>
+      <button class="primary" id="confirm-ok" disabled title="Entrée">Confirmer</button>
+    </div>
+  </div>
+
+  <div class="dock panel" role="toolbar" aria-label="Commandes">
+    <div class="group">
+      <button class="icon" id="rotL" aria-label="Tourner vers la gauche">⟲</button>
+      <div class="compass" title="Nord" aria-hidden="true">
+        <svg id="needle" width="24" height="24" viewBox="-12 -12 24 24">
+          <polygon points="0,-10 4.5,2 0,0 -4.5,2" fill="#d23b3b"/>
+          <polygon points="0,10 4.5,2 0,0 -4.5,2" fill="currentColor" opacity=".35"/>
+        </svg>
+      </div>
+      <button class="icon" id="rotR" aria-label="Tourner vers la droite">⟳</button>
+    </div>
+    <span class="sep"></span>
+    <div class="group" role="group" aria-label="Construire">
+      <button class="icon" data-batiment="maisonnette" aria-pressed="false" aria-label="Construire une maisonnette" title="Maisonnette">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+          <path d="M3 11 12 4l9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>
+        </svg>
+      </button>
+    </div>
+    <span class="sep"></span>
+    <div class="sizes" id="sizes" role="group" aria-label="Taille du massif">
+      <button data-size="petit">Petit</button>
+      <button data-size="moyen">Moyen</button>
+      <button data-size="grand">Grand</button>
+      <button data-size="immense">Immense</button>
+    </div>
+    <button class="primary" id="regen">Nouveau massif</button>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

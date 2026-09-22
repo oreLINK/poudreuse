@@ -1,0 +1,23 @@
+{
+  "name": "poudreuse",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Jeu de gestion de station de ski en 3D isométrique, sur des massifs générés procéduralement.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3",
+    "vitest": "^5.0.1"
+  }
+}
