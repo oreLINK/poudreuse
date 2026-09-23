@@ -13,5 +13,8 @@ export const C = {
   pine: c('#2d4f45'), pineDark: c('#23403a'), larch: c('#8a7b66'), ghost: c('#e8eef4'),
   wood: c('#7a5a43'), stone: c('#b9b1a4'), roof: c('#f1f5f9'), eave: c('#4a3a30'),
   cornice: c('#f6f9fc'), track: c('#b9c6d3'),
+  // sans neige : prés de fond de vallée, alpages, pierriers, toits de bardeaux, jeunes pins à la limite de la forêt
+  pre: c('#7d9455'), pre2: c('#8fa062'), alpage: c('#9da274'), alpage2: c('#aaa47e'),
+  pierrier: c('#8d887d'), sousBois: c('#5d7148'), toitEte: c('#6d5a4c'), jeunePin: c('#3b5a47'),
   ok: c('#2e9e5b'), bad: c('#d23b3b'),   // aperçu de construction (couleurs des pistes verte et rouge)
 };

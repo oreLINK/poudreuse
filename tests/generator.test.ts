@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SizeKey } from '../src/params/monde';
 import { STATION } from '../src/params/amenagement';
-import { classOf, type SlopeClass } from '../src/params/terrain';
+import { ALTITUDE, classOf, type SlopeClass } from '../src/params/terrain';
 import { isWaterAt, slopeAt } from '../src/gen/sol';
 import { generateDomain } from '../src/gen/domain';
 import type { Domain } from '../src/gen/types';
@@ -39,10 +39,17 @@ describe('générateur de domaine', () => {
     const { h } = domain(seed, size);
     let mn = Infinity, mx = -Infinity;
     for (const v of h) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
-    expect(mn).toBeGreaterThan(700);
-    expect(mn).toBeLessThan(1500);
-    expect(mx).toBeGreaterThan(2800);
+    // point bas d'une station de 1 300 à 2 000 m ; sommets plafonnés, sauf si le point bas est déjà au minimum
+    expect(mn).toBeGreaterThan(ALTITUDE.pointBas[0] - 0.01);
+    expect(mn).toBeLessThan(ALTITUDE.pointBas[1] + 0.01);
+    expect(mx).toBeGreaterThan(3200);
+    if (mn > ALTITUDE.pointBas[0] + 0.01) expect(mx).toBeLessThan(ALTITUDE.sommetMax + 0.01);
     expect(mx).toBeLessThan(5000);
+  });
+
+  it('le point bas varie d\'une carte à l\'autre', () => {
+    const lows = [1, 42, 777].map(s => Math.min(...domain(s, 'moyen').h));
+    expect(Math.max(...lows) - Math.min(...lows)).toBeGreaterThan(100);
   });
 
   it.each(CASES)('graine %i (%s) : répartition des pentes jouable', (seed, size) => {

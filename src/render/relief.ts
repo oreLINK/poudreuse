@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { rng } from '../gen/math';
 import type { Domain } from '../gen/types';
 import { NEIGE } from '../params/neige';
+import { patchNeige } from './neige';
 import { C } from './palette';
 import type { TerrainView } from './terrainView';
 
@@ -28,7 +29,7 @@ export function buildCornices(tv: TerrainView, d: Domain): THREE.InstancedMesh |
     });
   }
   if (!list.length) return null;
-  const im = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: C.cornice }), list.length);
+  const im = new THREE.InstancedMesh(geo, patchNeige(new THREE.MeshLambertMaterial({ color: C.cornice }), { masquer: true }), list.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3(), v = new THREE.Vector3();
   list.forEach((c, k) => { q.setFromAxisAngle(up, c.rot); sc.set(c.s * S, c.s * S, c.len); v.set(c.x, c.y, c.z); m.compose(v, q, sc); im.setMatrixAt(k, m); });
   im.castShadow = im.receiveShadow = true;
@@ -81,5 +82,5 @@ export function buildFreerideTracks(tv: TerrainView, d: Domain): THREE.Mesh | nu
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: C.track, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  return new THREE.Mesh(g, patchNeige(new THREE.MeshLambertMaterial({ color: C.track, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), { masquer: true }));
 }

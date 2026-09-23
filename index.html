@@ -21,6 +21,42 @@
     </div>
   </div>
 
+  <div class="coin">
+    <button class="horloge panel" id="horloge" aria-haspopup="true" aria-expanded="false" aria-controls="temps" title="Réglages du temps">
+      <strong class="horloge-heure" id="horloge-heure">--:--</strong>
+      <span class="horloge-ligne"><span id="horloge-date"></span> · <span id="horloge-saison"></span></span>
+      <span class="horloge-ligne horloge-meteo"><span id="horloge-ciel"></span> · <span id="horloge-temp"></span></span>
+    </button>
+
+    <div class="temps panel" id="temps" role="group" aria-label="Réglages du temps" hidden>
+      <p class="filtres-title">Journée</p>
+      <div class="choix" role="radiogroup" aria-label="Journée">
+        <label><input type="radio" name="journee" value="cycle"><span>Normal</span></label>
+        <label><input type="radio" name="journee" value="jour"><span>Jour</span></label>
+        <label><input type="radio" name="journee" value="nuit"><span>Nuit</span></label>
+      </div>
+      <p class="filtres-title">Saisons</p>
+      <div class="choix" role="radiogroup" aria-label="Saisons">
+        <label><input type="radio" name="saison" value="cycle"><span>Normal</span></label>
+        <label><input type="radio" name="saison" value="hiver"><span>Hiver</span></label>
+        <label><input type="radio" name="saison" value="ete"><span>Été</span></label>
+      </div>
+      <p class="temps-aide">Normal : jour puis nuit (5 min chacun) ; les quatre saisons, 20 min chacune.</p>
+    </div>
+
+    <div class="legende panel" id="legende" aria-live="polite" hidden>
+      <div id="legende-risque" hidden>
+        <strong>Risque d'avalanche</strong>
+        <div class="niveaux"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+      </div>
+      <div id="legende-proba" hidden>
+        <strong>Probabilité de neige (3 jours)</strong>
+        <div class="degrade"></div>
+        <div class="bornes"><span>0 %</span><span>99 %</span></div>
+      </div>
+    </div>
+  </div>
+
   <div class="loading" id="loading" aria-live="polite"><span class="panel">Génération du domaine…</span></div>
 
   <div class="confirm panel" id="confirm" role="group" aria-label="Construction" hidden>
@@ -43,6 +79,22 @@
       <span class="switch-text">
         <strong>Topographie</strong>
         <span>Courbes de niveau tous les 10 m, marquées tous les 100 m · touche T</span>
+      </span>
+    </label>
+    <label class="switch">
+      <input type="checkbox" role="switch" id="filtre-risque">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="switch-text">
+        <strong>Risque d'avalanche</strong>
+        <span>De 1 (vert) à 5 (violet), selon la pente et le manteau neigeux · touche A</span>
+      </span>
+    </label>
+    <label class="switch">
+      <input type="checkbox" role="switch" id="filtre-proba">
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="switch-text">
+        <strong>Probabilité de neige</strong>
+        <span>Chance qu'il neige sur le secteur en 3 jours, en moyenne de saison · touche N</span>
       </span>
     </label>
   </div>

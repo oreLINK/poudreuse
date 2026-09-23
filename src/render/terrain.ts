@@ -1,19 +1,22 @@
-// Terrain à facettes et socle du diorama.
+// Terrain à facettes et socle du diorama. Chaque facette a une couleur enneigée et une couleur d'été ;
+// le shader les mélange selon la carte du manteau neigeux, puis dessine les filtres (courbes de niveau, calques colorés).
 import * as THREE from 'three';
 import { clamp, makeNoise, rng } from '../gen/math';
-import { TOPO } from '../params/affichage';
+import { RISQUE } from '../params/avalanches';
+import { CALQUES, TOPO } from '../params/affichage';
 import { ECHELLE } from '../params/monde';
 import { NEIGE } from '../params/neige';
-import { shared } from './shaders';
+import { FORET } from '../params/vegetation';
+import { GLSL_CARTE, shared, uniformsCarte } from './shaders';
 import { C } from './palette';
 import type { TerrainView } from './terrainView';
 
 export function buildTerrain(tv: TerrainView, seed: number): THREE.Mesh {
   const { N, W, CELL, lake, conv, crestT, rockLim } = tv;
   const r = rng(seed + 7), n2 = makeNoise(rng(seed + 21)), n3 = makeNoise(rng(seed + 23));
-  const pos = new Float32Array(N * N * 18), col = new Float32Array(N * N * 18);
+  const pos = new Float32Array(N * N * 18), col = new Float32Array(N * N * 18), colEte = new Float32Array(N * N * 18);
   let p = 0;
-  const tmp = new THREE.Color();
+  const tmp = new THREE.Color(), ete = new THREE.Color();
   // convexité lissée sur quelques centaines de mètres : dessine des nervures et des couloirs continus
   const ribs = new Float32Array(W * W), rad = Math.max(1, Math.round(NEIGE.lissageNervures / CELL));
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -51,8 +54,9 @@ export function buildTerrain(tv: TerrainView, seed: number): THREE.Mesh {
       rockBand = band + rib + n > 0.75;
     }
 
+    const rocher = pct >= lim || rockBand || (crest && westward > 0.3 && pct > lim * 0.55);
     if (lake[j1 * W + i1] && lake[j2 * W + i2] && lake[j3 * W + i3]) tmp.copy(C.powder);
-    else if (pct >= lim || rockBand || (crest && westward > 0.3 && pct > lim * 0.55)) {
+    else if (rocher) {
       // roche : parois raides, barres rocheuses et crêtes soufflées côté vent
       tmp.copy(C.rock).lerp(C.rockLight, r() * 0.6 + (alt - 2000) / 4000);
     } else {
@@ -61,17 +65,21 @@ export function buildTerrain(tv: TerrainView, seed: number): THREE.Mesh {
       if (cv < -crestT * 0.6 && north > 0) tmp.lerp(C.bowl, 0.7);
       if (crest) tmp.lerp(C.hardpack, clamp(cv / (crestT * 3), 0, 1) * 0.8);
       tmp.multiplyScalar(0.965 + clamp((alt - 1100) / 1500, 0, 1) * 0.035);
-      // limite pluie-neige : des prés percent en adret à basse altitude
-      const rain = NEIGE.limitePluieNeige - north * NEIGE.limiteEcartUbac;
-      if (alt < rain) {
-        const n = n2((i1 * CELL) / 400, (j1 * CELL) / 400) * 0.5 + 0.5;
-        if (n > 0.45 + ((alt - (rain - 250)) / 250) * 0.55) tmp.copy(C.meadow).lerp(C.meadow2, r());
-      }
     }
-    tmp.offsetHSL(0, 0, (r() - 0.5) * 0.03);
+    // sans neige : prés et sous-bois sous la limite de la forêt, alpages au-dessus, puis pierriers ; la roche reste la roche
+    if (rocher) ete.copy(tmp);
+    else {
+      const foret = FORET.limite - north * FORET.ecartUbac, n = n2((i1 * CELL) / 400, (j1 * CELL) / 400) * 0.5 + 0.5;
+      if (alt < foret - 100) ete.copy(pct < 20 ? C.pre : C.sousBois).lerp(C.pre2, n * 0.6);
+      else if (alt < foret + 450) ete.copy(C.alpage).lerp(C.alpage2, n).lerp(C.pre, clamp((foret - alt) / 300, 0, 0.5));
+      else ete.copy(C.pierrier).lerp(C.rockLight, clamp((alt - foret - 450) / 900, 0, 0.6) * n + 0.1);
+    }
+    const bruit = (r() - 0.5) * 0.03;
+    tmp.offsetHSL(0, 0, bruit); ete.offsetHSL(0, 0, bruit * 1.5);
     for (const [ii, jj, hh] of [[i1, j1, a], [i2, j2, b], [i3, j3, c]]) {
       pos[p] = tv.toW(ii); pos[p + 1] = tv.Y(hh); pos[p + 2] = tv.toW(jj);
       col[p] = tmp.r; col[p + 1] = tmp.g; col[p + 2] = tmp.b;
+      colEte[p] = ete.r; colEte[p + 1] = ete.g; colEte[p + 2] = ete.b;
       p += 3;
     }
   };
@@ -82,29 +90,63 @@ export function buildTerrain(tv: TerrainView, seed: number): THREE.Mesh {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('colorEte', new THREE.BufferAttribute(colEte, 3));
   g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, topoMaterial());
+  const mesh = new THREE.Mesh(g, terrainMaterial());
   mesh.castShadow = mesh.receiveShadow = true;
   return mesh;
 }
 
+const vec3 = (c: string) => { const k = new THREE.Color(c); return `vec3(${k.r.toFixed(3)}, ${k.g.toFixed(3)}, ${k.b.toFixed(3)})`; };
+
 /**
- * Matériau du relief avec le filtre topographique : courbes de niveau tous les TOPO.equidistance mètres,
- * calculées au pixel (épaisseur constante à tous les zooms). Là où les courbes ordinaires se serreraient
- * au point de former un aplat (parois), elles s'effacent et seules les maîtresses restent.
+ * Matériau du relief :
+ * - enneigement : couleur enneigée ou couleur d'été selon la carte du manteau neigeux, neige humide légèrement grisée ;
+ * - filtre topographique : courbes de niveau tous les TOPO.equidistance mètres, calculées au pixel (épaisseur constante
+ *   à tous les zooms) ; là où les courbes ordinaires se serreraient au point de former un aplat (parois), elles s'effacent ;
+ * - calques colorés : risque d'avalanche (niveaux 1 à 5) ou probabilité de neige (blanc → bleu).
+ * Courbes et calques sont éclairés comme le relief le jour, et lumineux la nuit pour rester lisibles.
  */
-function topoMaterial() {
+function terrainMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });
   m.onBeforeCompile = sh => {
-    sh.uniforms.uTopo = shared.topo;
-    sh.uniforms.uTopoColor = { value: new THREE.Color(TOPO.couleur) };
+    Object.assign(sh.uniforms, uniformsCarte(), {
+      uTopo: shared.topo, uTopoColor: shared.topoColor, uTopoLueur: shared.topoLueur, uCalque: shared.calque, uCalqueA: shared.calqueA,
+    });
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vAltM;')
+      .replace('#include <common>', '#include <common>\nattribute vec3 colorEte; varying vec3 vEte; varying float vAltM; varying vec2 vXZ;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vEte = colorEte; vXZ = position.xz;
         vAltM = position.y / ${ECHELLE.VEX.toFixed(4)} * ${ECHELLE.UNIT.toFixed(1)} + ${ECHELLE.ALT0.toFixed(1)};`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vAltM; uniform float uTopo; uniform vec3 uTopoColor;')
+      .replace('#include <common>', `#include <common>
+        ${GLSL_CARTE}
+        varying vec3 vEte; varying float vAltM; varying vec2 vXZ;
+        uniform float uTopo; uniform vec3 uTopoColor; uniform float uTopoLueur; uniform float uCalque; uniform float uCalqueA;
+        vec3 couleurRisque(float n){
+          ${RISQUE.couleurs.map((c, i) => `if (n < ${(i + 1.5).toFixed(1)}) return ${vec3(c)};`).join(' ')}
+          return ${vec3(RISQUE.couleurs[4])};
+        }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+        vec4 carte = carteEn(vXZ);
+        // enneigement : bord irrégulier, neige humide un peu grise
+        float neige = smoothstep(.3, .7, carte.r + (fract(sin(dot(floor(vXZ * 3.), vec2(12.9898, 78.233))) * 43758.5453) - .5) * .25);
+        diffuseColor.rgb = mix(vEte, diffuseColor.rgb, neige);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(.94, .92, .87), carte.a * neige * .7);
+        // calques colorés
+        vec3 calqueC = vec3(0.); float calqueA = 0.;
+        if (uCalqueA > .001) {
+          if (uCalque < 1.5) {
+            float niv = floor(carteNette(vXZ).g * 5. + .5);
+            if (niv >= 1.) { calqueC = couleurRisque(niv); calqueA = ${CALQUES.opaciteRisque.toFixed(2)}; }
+          } else {
+            calqueC = mix(${vec3(CALQUES.probaMin)}, ${vec3(CALQUES.probaMax)}, carte.b);
+            calqueA = ${CALQUES.opaciteProba.toFixed(2)};
+          }
+          calqueA *= uCalqueA;
+          diffuseColor.rgb = mix(diffuseColor.rgb, calqueC, calqueA * (1. - uTopoLueur));
+        }
+        float topoA = 0.;
         if (uTopo > 0.001) {
           float fw = max(fwidth(vAltM), 1e-4);
           // distance (en pixels) à la courbe la plus proche
@@ -116,16 +158,20 @@ function topoMaterial() {
                       * (1. - smoothstep(${(1 / TOPO.ecartMin).toFixed(3)}, ${(2 / TOPO.ecartMin).toFixed(3)}, fw / ${TOPO.maitresse.toFixed(1)}))
                       // vue d'ensemble : les maîtresses se rapprochent, on les allège pour garder une carte légère
                       * (1. - ${(1 - TOPO.vueEnsemble).toFixed(2)} * smoothstep(${(1 / TOPO.ecartConfort).toFixed(4)}, ${(1 / TOPO.ecartMin).toFixed(4)}, fw / ${TOPO.maitresse.toFixed(1)}));
-          float a = max(minor * ${TOPO.opacite.toFixed(2)}, major * ${TOPO.opaciteMaitresse.toFixed(2)}) * uTopo;
-          diffuseColor.rgb = mix(diffuseColor.rgb, uTopoColor, a);
-        }`);
+          topoA = max(minor * ${TOPO.opacite.toFixed(2)}, major * ${TOPO.opaciteMaitresse.toFixed(2)}) * uTopo;
+          // de jour, les courbes sont éclairées comme la neige ; de nuit, elles luisent pour rester lisibles
+          diffuseColor.rgb = mix(diffuseColor.rgb, uTopoColor, topoA * (1. - uTopoLueur));
+        }`)
+      .replace('#include <opaque_fragment>', `outgoingLight = mix(outgoingLight, calqueC * ${CALQUES.intensiteNuit.toFixed(2)}, calqueA * uTopoLueur);
+        outgoingLight = mix(outgoingLight, uTopoColor, topoA * uTopoLueur * ${TOPO.intensiteNuit.toFixed(2)});
+        #include <opaque_fragment>`);
   };
   return m;
 }
 
 export function buildSkirt(tv: TerrainView): THREE.Mesh {
   const { N } = tv;
-  const BASE = -6, band = 0.5, pos: number[] = [], col: number[] = [];
+  const BASE = tv.Y(tv.minAlt) - 5, band = 0.5, pos: number[] = [], col: number[] = [];
   const push = (x: number, y: number, z: number, c: THREE.Color) => { pos.push(x, y, z); col.push(c.r, c.g, c.b); };
   const quad = (i1: number, j1: number, i2: number, j2: number) => {
     const x1 = tv.toW(i1), z1 = tv.toW(j1), x2 = tv.toW(i2), z2 = tv.toW(j2);

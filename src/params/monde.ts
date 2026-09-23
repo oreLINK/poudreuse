@@ -22,5 +22,5 @@ export const ECHELLE = {
   /** Exagération verticale, pour la lisibilité du relief. */
   VEX: 1.3,
   /** Altitude (m) placée à y = 0. */
-  ALT0: 1000,
+  ALT0: 1600,
 };

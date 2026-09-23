@@ -1,5 +1,16 @@
 // Paramètres du relief généré. Toutes les distances et altitudes sont en mètres.
 // Modifier ces valeurs change les cartes produites par une même graine : relancer `npm test`.
+//
+// Le relief est d'abord construit dans un repère de référence (point bas vers 850–1 150 m) : les altitudes
+// de RELIEF et de LACS, comme les fonds de vallée de gen/network.ts, s'expriment dans ce repère.
+// ALTITUDE relève ensuite toute la carte d'un même décalage, sans changer les pentes.
+
+export const ALTITUDE = {
+  /** Le point bas de la carte est tiré au hasard dans cet intervalle : de la station de moyenne montagne à la station d'altitude. */
+  pointBas: [1300, 2000] as [number, number],
+  /** Plafond des sommets : sur un relief très haut, le point bas est abaissé (sans passer sous pointBas[0]) pour rester réaliste. */
+  sommetMax: 4800,
+};
 
 /** Caractère des massifs : hauteur des versants, largeur, finesse des crêtes, rugosité, aiguilles. */
 export const TYPES = {
@@ -13,7 +24,7 @@ export type TypeKey = keyof typeof TYPES;
 export const RELIEF = {
   /** Hausse de la hauteur des massifs par rang de taille (+9 % par rang). */
   hausseParRang: 0.09,
-  /** Au-delà de ce seuil, les altitudes sont tassées pour rester réalistes. */
+  /** Au-delà de ce seuil (repère de référence), les altitudes sont tassées pour rester réalistes. */
   tassementSeuil: 3900,
   tassementFacteur: 0.55,
 };
@@ -29,7 +40,7 @@ export const EROSION = {
 };
 
 export const LACS = {
-  /** Pas de lac d'altitude sous ce niveau. */
+  /** Pas de lac d'altitude sous ce niveau (repère de référence, avant relèvement). */
   altitudeMin: 1750,
 };
 

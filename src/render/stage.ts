@@ -17,6 +17,8 @@ export class Stage {
   readonly target = new THREE.Vector3();
   mapW = 200;
   private viewW = 300;
+  /** Brume (0–1) : brouillard et précipitations réduisent la visibilité. */
+  brume = 0;
 
   constructor(private host: HTMLElement, private reduceMotion: boolean) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -79,8 +81,8 @@ export class Stage {
     c.zoom = this.zoom;
     c.updateProjectionMatrix();
     // perspective atmosphérique : le fond de la carte s'estompe légèrement
-    this.fog.near = d + this.mapW * 0.15;
-    this.fog.far = d + this.mapW * 2.2;
+    this.fog.near = d + this.mapW * (0.15 - 0.9 * this.brume);
+    this.fog.far = d + this.mapW * (2.2 - 1.3 * this.brume);
   }
 
   /** Angle (degrés) de la direction du nord (-z) à l'écran. */
@@ -91,6 +93,9 @@ export class Stage {
   }
 
   render() { this.renderer.render(this.scene, this.camera); }
+
+  /** Largeur du terrain visible à l'écran (unités 3D). */
+  get largeurVue() { return this.viewW / this.zoom; }
 
   // Glisser = déplacer, molette / pincer = zoomer, flèches = pivoter
   private bindControls() {

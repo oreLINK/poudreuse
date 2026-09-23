@@ -28,8 +28,15 @@ export const TOPO = {
   equidistance: 10,
   /** Une courbe maîtresse, plus marquée, toutes les N mètres. */
   maitresse: 100,
-  /** Orange léger. */
-  couleur: '#f5b574',
+  /**
+   * Couleur selon l'éclairage : brun-ocre foncé sur la neige éclairée, crème lumineux la nuit (non assombri par l'éclairage),
+   * mélange au crépuscule.
+   * Bleu, vert, rouge et noir sont réservés aux pistes, violet au risque d'avalanche.
+   */
+  couleurJour: '#7a4f24',
+  couleurNuit: '#d9c49a',
+  /** Intensité relative des courbes la nuit (lumineuses sur fond sombre, elles ressortent plus que de jour). */
+  intensiteNuit: 0.6,
   /** Intensité des courbes ordinaires et des courbes maîtresses (0–1). */
   opacite: 0.5,
   opaciteMaitresse: 0.7,
@@ -41,6 +48,20 @@ export const TOPO = {
   /** Au-dessous de cet écart (pixels), les courbes maîtresses s'allègent jusqu'à `vueEnsemble` × leur intensité. */
   ecartConfort: 40,
   vueEnsemble: 0.35,
+  /** Durée (s) du fondu à l'activation. */
+  fondu: 0.25,
+};
+
+/** Calques colorés du menu « Filtres » (un seul à la fois). Couleurs du risque : RISQUE.couleurs dans avalanches.ts. */
+export const CALQUES = {
+  /** Intensité du calque de risque d'avalanche (niveaux 1 à 5 ; le niveau 0 n'est pas coloré). */
+  opaciteRisque: 0.6,
+  /** Probabilité de neige : blanc à 0 %, bleu à 99 %. */
+  probaMin: '#ffffff',
+  probaMax: '#1f5fd0',
+  opaciteProba: 0.75,
+  /** Luminosité des calques la nuit (ils restent lisibles sur le relief sombre). */
+  intensiteNuit: 0.75,
   /** Durée (s) du fondu à l'activation. */
   fondu: 0.25,
 };

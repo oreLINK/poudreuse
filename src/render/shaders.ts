@@ -1,12 +1,40 @@
 import * as THREE from 'three';
 
+/** Carte du manteau neigeux par défaut (tout enneigé), avant la première mise à jour de la simulation. */
+const carteVide = new THREE.DataTexture(new Uint8Array([255, 0, 0, 0]), 1, 1);
+carteVide.needsUpdate = true;
+
 /** Uniformes partagés : temps (animations) et couleur de la lumière ambiante (cycle du jour). */
 export const shared = {
   time: { value: 0 },
   light: { value: new THREE.Color(1, 1, 1) },
   /** Visibilité du filtre topographique (0 = masqué, 1 = affiché). */
   topo: { value: 0 },
+  /** Couleur des courbes de niveau, qui suit l'éclairage (render/dayCycle.ts). */
+  topoColor: { value: new THREE.Color(1, 1, 1) },
+  /** Part des courbes affichée sans éclairage (0 = éclairées comme le relief, 1 = lumineuses, la nuit). */
+  topoLueur: { value: 0 },
+  /**
+   * Carte du manteau neigeux (sim/manteau.ts), un texel par sommet de grille : r = enneigement, g = risque / 5,
+   * b = probabilité de neige, a = humidité. uCarteN = cases par côté, uCarteS = taille d'une case en unités 3D.
+   */
+  carte: { value: carteVide as THREE.Texture },
+  carteN: { value: 1 },
+  carteS: { value: 1 },
+  /** Calque coloré affiché sur le relief : 0 = aucun, 1 = risque d'avalanche, 2 = probabilité de neige ; et sa visibilité (0–1). */
+  calque: { value: 0 },
+  calqueA: { value: 0 },
 };
+
+/** Uniformes à donner à un matériau qui lit la carte du manteau neigeux. */
+export const uniformsCarte = () => ({ uCarte: shared.carte, uCarteN: shared.carteN, uCarteS: shared.carteS });
+
+/** Lecture de la carte du manteau neigeux en un point de la scène (coordonnées x, z en unités 3D). */
+export const GLSL_CARTE = /* glsl */ `
+  uniform sampler2D uCarte; uniform float uCarteN; uniform float uCarteS;
+  vec4 carteEn(vec2 xz){ vec2 g = xz / uCarteS + uCarteN * .5; return texture2D(uCarte, (g + .5) / (uCarteN + 1.)); }
+  /** Valeur du sommet de grille le plus proche, sans interpolation (niveaux de risque : pas de dégradé entre 0 et 5). */
+  vec4 carteNette(vec2 xz){ vec2 g = floor(xz / uCarteS + uCarteN * .5 + .5); return texture2D(uCarte, (g + .5) / (uCarteN + 1.)); }`;
 
 export const GLSL_NOISE = /* glsl */ `
   float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -18,10 +46,13 @@ export const WORLD_XZ_VERT = /* glsl */ `
   varying vec2 vW;
   void main(){ vW = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
 
-/** Lac gelé : glace bleu turquoise, pellicule de neige étirée par le vent, fissures sombres. */
-export const LAKE_FRAG = GLSL_NOISE + /* glsl */ `
-  uniform vec3 light; varying vec2 vW;
+/** Lac : gelé (glace turquoise, pellicule de neige, fissures) tant que la neige tient autour, eau libre sinon. */
+export const LAKE_FRAG = GLSL_NOISE + GLSL_CARTE + /* glsl */ `
+  uniform vec3 light; uniform float time; varying vec2 vW;
   void main(){
+    float gel = smoothstep(.25, .6, carteEn(vW).r);
+    vec3 eau = mix(vec3(.13, .30, .42), vec3(.20, .42, .52), vnoise(vW * .08 + time * .05));
+    eau += vec3(.10, .12, .12) * smoothstep(.72, .9, vnoise(vec2(vW.x * .6, vW.y * 1.4) + time * .4));
     vec3 deep = vec3(.25, .49, .66), turq = vec3(.28, .62, .70), snow = vec3(.93, .96, .99), dark = vec3(.12, .25, .34);
     vec3 c = mix(deep, turq, vnoise(vW * .12));
     float film = smoothstep(.5, .8, fbm(vec2(vW.x * .18, vW.y * .7)));
@@ -29,14 +60,18 @@ export const LAKE_FRAG = GLSL_NOISE + /* glsl */ `
     float n = fbm(vW * .45 + fbm(vW * .25) * 2.);
     float crack = 1. - smoothstep(.0, .018, abs(n - .5));
     c = mix(c, dark, crack * .55);
-    gl_FragColor = vec4(c * light, 1.);
+    gl_FragColor = vec4(mix(eau, c, gel) * light, 1.);
   }`;
 
 /** Torrent : tronçons gelés et eau vive sombre parcourue de reflets qui descendent le courant. */
-export const RIVER_VERT = /* glsl */ `
+export const RIVER_VERT = GLSL_CARTE + /* glsl */ `
   attribute float along; attribute float across; attribute float frozen;
   varying float vAlong; varying float vAcross; varying float vFrozen;
-  void main(){ vAlong = along; vAcross = across; vFrozen = frozen; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
+  void main(){
+    vAlong = along; vAcross = across;
+    vFrozen = frozen * smoothstep(.3, .8, carteEn(position.xz).r);   // les torrents dégèlent avec la neige
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
+  }`;
 export const RIVER_FRAG = /* glsl */ `
   uniform float time; uniform vec3 light;
   varying float vAlong; varying float vAcross; varying float vFrozen;

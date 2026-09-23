@@ -1,4 +1,5 @@
-// Paramètres de l'enneigement affiché : où la neige tient, où la roche perce.
+// Paramètres de l'enneigement affiché : où la roche perce, corniches, traces.
+// L'épaisseur de neige elle-même (saison, chutes, fonte) est simulée : voir climat.ts et avalanches.ts.
 
 export const NEIGE = {
   /** Pente (%) au-delà de laquelle la neige ne tient plus, pour une maille de 70 m (le seuil baisse sur les grandes mailles). */
@@ -15,14 +16,11 @@ export const NEIGE = {
   /** Taille (m) des plaques qui rendent les barres rocheuses irrégulières. */
   plaque: 350,
   /** Au-dessus de cette altitude, le vent et le froid décapent les faces : le seuil de roche baisse… */
-  decapageAlt: 2800,
+  decapageAlt: 3300,
   /** … jusqu'à cette fraction, atteinte 1 000 m plus haut. */
   decapageMax: 0.25,
-  /** Limite pluie-neige : des prés percent en adret sous cette altitude, plus bas en ubac. */
-  limitePluieNeige: 1250,
-  limiteEcartUbac: 120,
   /** Corniches sur les crêtes au-dessus de cette altitude. */
-  cornicheAlt: 2400,
+  cornicheAlt: 2800,
   /** Traces de freeride dans les combes nord au-dessus de cette altitude. */
-  freerideAlt: 2250,
+  freerideAlt: 2600,
 };

@@ -1,5 +1,7 @@
-// Cycle de la journée : matin froid aux ombres bleues, midi, alpenglow au couchant, nuit lunaire.
+// Cycle de la journée : matin froid aux ombres bleues, midi, alpenglow au couchant, nuit lunaire ;
+// assombri et grisé par les nuages, éclairé par les éclairs d'orage, noyé par le brouillard.
 import * as THREE from 'three';
+import { TOPO } from '../params/affichage';
 import { TEMPS } from '../params/temps';
 import { LIGHT_SCALE } from './colorSetup';
 import { shared } from './shaders';
@@ -19,21 +21,25 @@ const RAW: Key[] = [
 ];
 const KEYS = RAW.map(k => ({ ...k, top: new THREE.Color(k.top), bot: new THREE.Color(k.bot), sun: new THREE.Color(k.sun), sky: new THREE.Color(k.sky), gnd: new THREE.Color(k.gnd) }));
 
+const TOPO_JOUR = new THREE.Color(TOPO.couleurJour), TOPO_NUIT = new THREE.Color(TOPO.couleurNuit);
+
+/** Ce que l'éclairage lit de la météo (sim/meteo.ts). */
+export interface EtatCiel { couverture: number; brouillard: number; eclair: number }
+const CIEL_CLAIR: EtatCiel = { couverture: 0, brouillard: 0, eclair: 0 };
+
+/** Éclairage selon la phase de la journée (fournie par sim/temps.ts) : 0 = minuit, 0,5 ≈ midi. */
 export class DayCycle {
-  /** Phase dans la journée : 0 = minuit, ~0.1 = matin. */
-  phase = TEMPS.phaseDepart;
   private tick = 0;
   private readonly top = new THREE.Color();
   private readonly bot = new THREE.Color();
   private readonly white = new THREE.Color(1, 1, 1);
   private readonly dir = new THREE.Vector3();
   private readonly tmp = new THREE.Color();
+  private readonly gris = new THREE.Color();
 
   constructor(private sun: THREE.DirectionalLight, private hemi: THREE.HemisphereLight, private fog: THREE.Fog) {}
 
-  advance(dt: number) { this.phase = (this.phase + dt / TEMPS.dureeJournee) % 1; }
-
-  apply(world: World | null, p = this.phase) {
+  apply(world: World | null, p: number, ciel: EtatCiel = CIEL_CLAIR) {
     let a = KEYS[0], b = KEYS[1];
     for (let k = 0; k < KEYS.length - 1; k++) if (p >= KEYS[k].p && p <= KEYS[k + 1].p) { a = KEYS[k]; b = KEYS[k + 1]; break; }
     const t = (p - a.p) / (b.p - a.p || 1), L = (x: number, y: number) => x + (y - x) * t;
@@ -46,8 +52,19 @@ export class DayCycle {
     this.hemi.intensity = L(a.hi, b.hi) * LIGHT_SCALE;
     const night = L(a.night, b.night);
 
+    // nuages : moins de soleil direct, lumière diffuse grise, ciel terne ; éclair : flash blanc
+    const cv = ciel.couverture, ec = ciel.eclair;
+    this.sun.intensity *= 1 - 0.75 * cv;
+    this.hemi.intensity *= 1 + 0.2 * cv;
+    this.hemi.intensity += ec * 2.2 * LIGHT_SCALE;
+    this.hemi.color.lerp(this.gris.setScalar(this.hemi.color.getHSL({ h: 0, s: 0, l: 0 }).l), cv * 0.6);
+    for (const c of [this.top, this.bot]) {
+      c.lerp(this.gris.setScalar(c.getHSL({ h: 0, s: 0, l: 0 }).l * (1 - 0.1 * cv)), cv * 0.7);
+      c.lerp(this.white, ec * 0.6);
+    }
+
     // le soleil se lève à l'est (+x), passe au sud (+z), se couche à l'ouest ; la lune éclaire la nuit
-    const dayT = (p - 0.03) / 0.77;
+    const dayT = (p - TEMPS.lever) / (TEMPS.coucher - TEMPS.lever);
     if (dayT > 0 && dayT < 1) {
       const th = Math.PI * dayT, el = Math.max(0.07, Math.sin(Math.PI * dayT) * 0.72);
       this.dir.set(Math.cos(th) * Math.cos(el), Math.sin(el), Math.sin(th) * Math.cos(el));
@@ -65,7 +82,13 @@ export class DayCycle {
       cm.uniforms.opacity.value = L(a.cl, b.cl);
       (cm.uniforms.color.value as THREE.Color).copy(this.bot).lerp(this.white, 0.55).multiplyScalar(0.5 + 0.5 * (1 - night * 0.6));
       world.batiments.wallMaterial.emissive.setRGB(night * 0.55, night * 0.33, night * 0.12);   // fenêtres allumées
+      // brouillard : la mer de nuages s'épaissit et monte
+      cm.uniforms.opacity.value = Math.max(cm.uniforms.opacity.value, 0.92 * ciel.brouillard);
+      world.cloudMesh.position.y = world.cloudY + ciel.brouillard * 6;
     }
+    // courbes de niveau : brun-ocre sur la neige éclairée, crème la nuit
+    shared.topoColor.value.copy(TOPO_JOUR).lerp(TOPO_NUIT, night);
+    shared.topoLueur.value = night;
     this.fog.color.copy(this.bot);
     if (this.tick++ % 4 === 0) {
       document.body.style.background = `linear-gradient(180deg, #${this.top.getHexString()}, #${this.bot.getHexString()})`;

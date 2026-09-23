@@ -2,6 +2,9 @@
 import * as THREE from 'three';
 import type { Domain } from '../gen/types';
 import { Spindrift, buildClouds } from './atmosphere';
+import { AvalanchesVue } from './avalanches';
+import { Precipitations } from './precipitations';
+import { shared } from './shaders';
 import { buildCornices, buildFreerideTracks } from './relief';
 import { buildSkirt, buildTerrain } from './terrain';
 import { TerrainView } from './terrainView';
@@ -13,6 +16,12 @@ export class World {
   readonly group = new THREE.Group();
   readonly view: TerrainView;
   readonly cloudMaterial: THREE.ShaderMaterial;
+  /** Mer de nuages et sa hauteur de base (elle monte par temps de brouillard). */
+  readonly cloudMesh: THREE.Mesh;
+  readonly cloudY: number;
+  readonly avalanches: AvalanchesVue;
+  readonly precipitations = new Precipitations();
+  private carte: THREE.DataTexture | null = null;
   readonly batiments: BatimentsVue;
   readonly vegetation: Vegetation;
   readonly spindrift: Spindrift | null;
@@ -33,14 +42,32 @@ export class World {
     const clouds = buildClouds(tv, domain);
     add(clouds.mesh);
     this.cloudMaterial = clouds.material;
+    this.cloudMesh = clouds.mesh;
+    this.cloudY = clouds.mesh.position.y;
+    this.avalanches = new AvalanchesVue(tv);
+    add(this.avalanches.group);
+    add(this.precipitations.points);
     this.spindrift = Spindrift.build(tv);
     add(this.spindrift?.points ?? null);
   }
+
+  /** Relie la carte du manteau neigeux (sim/manteau.ts, 4 octets par sommet) aux shaders. */
+  attacherCarte(data: Uint8Array<ArrayBuffer>) {
+    const W = this.view.N + 1, tex = new THREE.DataTexture(data, W, W, THREE.RGBAFormat);
+    tex.magFilter = tex.minFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    this.carte = tex;
+    shared.carte.value = tex; shared.carteN.value = this.view.N; shared.carteS.value = this.view.S;
+  }
+
+  /** À appeler après chaque mise à jour du manteau neigeux. */
+  carteModifiee() { if (this.carte) this.carte.needsUpdate = true; }
 
   get mapW() { return this.view.mapW; }
   get topY() { return this.view.Y(this.view.maxAlt); }
 
   dispose() {
+    this.carte?.dispose();
     this.group.traverse(o => {
       const m = o as THREE.Mesh;
       m.geometry?.dispose();

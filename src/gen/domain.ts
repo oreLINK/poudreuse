@@ -1,7 +1,7 @@
-// Génération complète d'un domaine : relief, pics, érosion, lacs, aire de la station, hydrologie.
+// Génération complète d'un domaine : relief, pics, érosion, lacs, aire de la station, hydrologie, altitude réelle.
 import { STATION } from '../params/amenagement';
 import { DEFAULT_SIZE, SIZES, type SizeKey } from '../params/monde';
-import { EROSION, LACS, PICS, RELIEF, TYPES, type TypeKey } from '../params/terrain';
+import { ALTITUDE, EROSION, LACS, PICS, RELIEF, TYPES, type TypeKey } from '../params/terrain';
 import { makeNoise, rng, smax, smin, smooth } from './math';
 import { buildNetwork } from './network';
 import { erode } from './erosion';
@@ -181,8 +181,26 @@ export function generateDomain(seed: number, size: SizeKey = DEFAULT_SIZE): Doma
   const { lake, parent, eps } = fillDepressions(h, N, CELL, lakeZone);
   const { rivers, isRiver } = traceRivers(h, N, CELL, lake, parent, eps, seed);
 
+  // ---------- Altitude réelle : toute la carte est relevée d'un même décalage (les pentes ne changent pas) ----------
+  const dz = relever(h, rng(seed + 32));
+  for (const river of rivers) for (const p of river) p[3] += dz;
+
   station.alt = hAtM(station.x, station.z);
   return { seed, N, CELL, L, h, lake, isRiver, rivers, station };
+}
+
+/**
+ * Relève la carte pour que son point bas tombe dans ALTITUDE.pointBas, tiré au hasard,
+ * abaissé si besoin pour que les sommets ne dépassent pas ALTITUDE.sommetMax. Renvoie le décalage (m).
+ */
+function relever(h: Float32Array, r: () => number): number {
+  let mn = Infinity, mx = -Infinity;
+  for (const v of h) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const [bas, haut] = ALTITUDE.pointBas;
+  const cible = Math.max(bas, Math.min(bas + r() * (haut - bas), ALTITUDE.sommetMax - (mx - mn)));
+  const dz = cible - mn;
+  for (let k = 0; k < h.length; k++) h[k] += dz;
+  return dz;
 }
 
 /**

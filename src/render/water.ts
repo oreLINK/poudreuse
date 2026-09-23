@@ -1,8 +1,8 @@
-// Lacs gelés et torrents semi-gelés.
+// Lacs et torrents, gelés tant que la neige tient autour (carte du manteau neigeux).
 import * as THREE from 'three';
 import { clamp, makeNoise, rng } from '../gen/math';
 import type { Domain } from '../gen/types';
-import { LAKE_FRAG, RIVER_FRAG, RIVER_VERT, WORLD_XZ_VERT, shared } from './shaders';
+import { LAKE_FRAG, RIVER_FRAG, RIVER_VERT, WORLD_XZ_VERT, shared, uniformsCarte } from './shaders';
 import type { TerrainView } from './terrainView';
 
 export function buildLakes(tv: TerrainView): THREE.Mesh | null {
@@ -19,7 +19,7 @@ export function buildLakes(tv: TerrainView): THREE.Mesh | null {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { light: shared.light },
+    uniforms: { light: shared.light, time: shared.time, ...uniformsCarte() },
     vertexShader: WORLD_XZ_VERT, fragmentShader: LAKE_FRAG,
     polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   });
@@ -98,7 +98,7 @@ export function buildRivers(tv: TerrainView, d: Domain): THREE.Mesh | null {
   g.setAttribute('frozen', new THREE.Float32BufferAttribute(frozen, 1));
   g.setIndex(idx);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { time: shared.time, light: shared.light },
+    uniforms: { time: shared.time, light: shared.light, ...uniformsCarte() },
     vertexShader: RIVER_VERT, fragmentShader: RIVER_FRAG,
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });

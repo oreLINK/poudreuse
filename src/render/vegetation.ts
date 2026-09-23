@@ -4,6 +4,7 @@ import { makeNoise, rng } from '../gen/math';
 import type { Domain } from '../gen/types';
 import { OBJETS } from '../params/affichage';
 import { FORET } from '../params/vegetation';
+import { patchNeige } from './neige';
 import { C } from './palette';
 import type { TerrainView } from './terrainView';
 
@@ -59,9 +60,10 @@ export function buildVegetation(tv: TerrainView, d: Domain): Vegetation {
   const ghost = new THREE.ConeGeometry(0.5, 1.1, 5); ghost.translate(0, 0.5, 0);
   const meshes: [THREE.InstancedMesh, Tree[]][] = [
     [make(cone, new THREE.MeshLambertMaterial(), spots.pine, t => (t.dark ? C.pineDark : C.pine)), spots.pine],
-    [make(tip, new THREE.MeshLambertMaterial({ color: C.powder }), spots.pine), spots.pine],
+    // chapeau de neige des pins et arbres englacés : suivent l'enneigement (disparus ou verts en été)
+    [make(tip, patchNeige(new THREE.MeshLambertMaterial({ color: C.powder }), { masquer: true }), spots.pine), spots.pine],
     [make(larch, new THREE.MeshLambertMaterial({ color: C.larch }), spots.larch), spots.larch],
-    [make(ghost, new THREE.MeshLambertMaterial({ color: C.ghost }), spots.ghost), spots.ghost],
+    [make(ghost, patchNeige(new THREE.MeshLambertMaterial({ color: C.ghost }), { ete: C.jeunePin }), spots.ghost), spots.ghost],
   ];
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {

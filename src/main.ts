@@ -9,21 +9,27 @@ import { DayCycle } from './render/dayCycle';
 import { shared } from './render/shaders';
 import { Stage } from './render/stage';
 import { World } from './render/world';
-import { Meteo } from './sim/meteo';
+import { limitePluieNeige } from './sim/climat';
+import { SimMonde } from './sim/monde';
+import { Horloge } from './sim/temps';
 import { ModeConstruction } from './ui/construction';
 import { MenuFiltres } from './ui/filtres';
+import { AffichageHorloge } from './ui/horloge';
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
 const stage = new Stage($('#scene'), reduceMotion);
 const day = new DayCycle(stage.sun, stage.hemi, stage.fog);
+// animations réduites : l'horloge reste figée sur la lumière du matin
+const horloge = new Horloge(reduceMotion ? { phaseDepart: TEMPS.phaseFigee } : {});
+const affichageHorloge = new AffichageHorloge(horloge);
 const construction = new ModeConstruction(stage, $('#scene'));
 const filtres = new MenuFiltres(reduceMotion);
 // un seul panneau à la fois au-dessus du dock
 document.querySelectorAll('[data-batiment]').forEach(b => b.addEventListener('click', () => filtres.ouvrir(false)));
 let world: World | null = null;
-let meteo: Meteo | null = null;
+let sim: SimMonde | null = null;
 
 // ---------- Génération (Web Worker) ----------
 const worker = new Worker(new URL('./gen/generator.worker.ts', import.meta.url), { type: 'module' });
@@ -56,11 +62,12 @@ function generate(seed = Math.floor(Math.random() * 99999)) {
 worker.onmessage = (e: MessageEvent<Domain>) => {
   world?.dispose();
   world = new World(e.data);
-  meteo = new Meteo(e.data.seed, e.data.L);
+  sim = new SimMonde(e.data, horloge);
+  world.attacherCarte(sim.manteau.carte);
   construction.attacher(world);
   stage.scene.add(world.group);
   stage.frame(world.mapW, world.topY);
-  day.apply(world);
+  day.apply(world, horloge.phase, sim.meteo);
   setBusy(false);
 };
 worker.onerror = err => { console.error(err); setBusy(false); };
@@ -80,13 +87,27 @@ let last = performance.now();
 function loop(now: number) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-  if (!reduceMotion) { shared.time.value += dt; day.advance(dt); meteo?.update(dt); }
-  day.apply(world, reduceMotion ? TEMPS.phaseFigee : day.phase);
+  const zoomPx = stage.renderer.getPixelRatio() * Math.sqrt(stage.zoom);
+  if (!reduceMotion) {
+    shared.time.value += dt;
+    horloge.update(dt);
+    if (sim && world) for (const a of sim.update(dt, horloge)) world.avalanches.ajouter(a);
+  }
+  if (sim && world && sim.carteModifiee) { world.carteModifiee(); sim.carteModifiee = false; }
+  const meteo = sim?.meteo ?? null;
+  day.apply(world, horloge.phase, meteo ?? undefined);
+  stage.brume = meteo ? Math.min(1, meteo.brouillard + meteo.precipitation * 0.35) : 0;
   stage.update(dt);
   filtres.update(dt);
+  affichageHorloge.update(meteo, sim ? sim.temperatureStation(horloge) : 0);
   needle.style.transform = `rotate(${stage.northAngle()}deg)`;
-  if (world?.spindrift && meteo && !reduceMotion) world.spindrift.update(dt, 2.2 * stage.renderer.getPixelRatio() * Math.sqrt(stage.zoom), meteo);
+  if (world && sim && !reduceMotion) {
+    world.spindrift?.update(dt, 2.2 * zoomPx, sim.meteo);
+    world.avalanches.update(dt, 2.2 * zoomPx);
+    const vent = sim.meteo.intensiteEn(sim.d.station.x, sim.d.station.z);
+    world.precipitations.update(dt, world.view, stage.target, stage.largeurVue, sim.meteo.precipitation, limitePluieNeige(sim.contexte(horloge)), vent, 2 * zoomPx);
+  }
   stage.render();
-  requestAnimationFrame(loop);
+requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

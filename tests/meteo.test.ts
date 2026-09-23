@@ -1,4 +1,4 @@
-// Tests du vent : épisodes variés, calme sans vent, rafales localisées.
+// Tests de la météo : vent (épisodes variés, calme sans vent, rafales localisées) et ciel (états, orages, tempêtes).
 import { describe, expect, it } from 'vitest';
 import { Meteo } from '../src/sim/meteo';
 
@@ -45,5 +45,49 @@ describe('météo', () => {
 
   it('est déterministe pour une même graine', () => {
     expect(run(3, 200)).toEqual(run(3, 200));
+  });
+});
+
+/** Fait tourner le ciel pendant `heures` heures de jeu (pas de 0,1 s réelle = 0,01 h). */
+function ciel(seed: number, heures: number, chaleur: number, temperatureStation: number) {
+  const m = new Meteo(seed, L), etats = new Set<string>();
+  let eclairs = 0, orages = 0, tempetes = 0, ventTempete = 0;
+  for (let h = 0; h < heures; h += 0.01) {
+    m.update(0.1, { heures: 0.01, chaleur, temperatureStation });
+    etats.add(m.ciel);
+    if (m.eclair === 1) eclairs++;
+    if (m.ciel === 'tempete') { tempetes++; if (m.estOrage(temperatureStation)) orages++; if (m.precipitation > 0.9) ventTempete = Math.max(ventTempete, m.intensiteEn(L / 2, L / 2)); }
+  }
+  return { etats, eclairs, orages, tempetes, ventTempete, m };
+}
+
+describe('ciel', () => {
+  const hiver = ciel(11, 600, 0, -6), ete = ciel(11, 600, 1, 16);
+
+  it('passe par tous les états : dégagé, nuageux, brouillard, précipitations, tempête', () => {
+    expect([...hiver.etats].sort()).toEqual(['brouillard', 'degage', 'nuageux', 'precipitations', 'tempete']);
+    expect([...ete.etats].sort()).toEqual(['brouillard', 'degage', 'nuageux', 'precipitations', 'tempete']);
+  });
+
+  it('l\'hiver : tempêtes de neige sans éclairs, avec un vent fort partout', () => {
+    expect(hiver.tempetes).toBeGreaterThan(0);
+    expect(hiver.orages).toBe(0);
+    expect(hiver.eclairs).toBe(0);
+    expect(hiver.ventTempete).toBeGreaterThan(0.8);
+  });
+
+  it('l\'été : orages avec éclairs, plus courts que les tempêtes d\'hiver', () => {
+    expect(ete.orages).toBeGreaterThan(0);
+    expect(ete.eclairs).toBeGreaterThan(5);
+  });
+
+  it('couverture, brouillard et précipitations restent entre 0 et 1', () => {
+    const m = hiver.m;
+    for (const v of [m.couverture, m.brouillard, m.precipitation]) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1); }
+  });
+
+  it('est déterministe pour une même graine', () => {
+    const a = ciel(5, 100, 0.5, 2).m, b = ciel(5, 100, 0.5, 2).m;
+    expect([a.ciel, a.couverture, a.precipitation]).toEqual([b.ciel, b.couverture, b.precipitation]);
   });
 });

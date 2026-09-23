@@ -5,13 +5,14 @@ import { emprise } from '../jeu/construction';
 import { OBJETS } from '../params/affichage';
 import { BATIMENTS, type CleBatiment } from '../params/batiments';
 import { ECHELLE } from '../params/monde';
+import { patchNeige } from './neige';
 import { C } from './palette';
 import type { TerrainView } from './terrainView';
 
 const ARBRE_U = OBJETS.arbre * OBJETS.echelle;   // diamètre d'un arbre en unités 3D
 interface Mats { wall: THREE.Material; roof: THREE.Material; eave: THREE.Material; stone: THREE.Material; door: THREE.Material }
 
-/** Maison minimaliste : soubassement de pierre, murs de bois, toit enneigé à deux pans. Origine = centre du plancher. */
+/** Maison minimaliste : soubassement de pierre, murs de bois, toit à deux pans (enneigé selon la saison). Origine = centre du plancher. */
 function maison(type: CleBatiment, rot: Rotation, m: Mats) {
   const t = BATIMENTS[type], [lxm, lzm] = emprise(type, rot);
   const lx = lxm / ECHELLE.UNIT, lz = lzm / ECHELLE.UNIT, hw = t.hauteurMurs * ARBRE_U, hr = t.hauteurToit * ARBRE_U;
@@ -50,7 +51,7 @@ export class BatimentsVue {
   readonly wallMaterial = new THREE.MeshLambertMaterial({ color: C.wood, emissive: new THREE.Color(0, 0, 0) });
   private readonly mats: Mats = {
     wall: this.wallMaterial,
-    roof: new THREE.MeshLambertMaterial({ color: C.roof }),
+    roof: patchNeige(new THREE.MeshLambertMaterial({ color: C.roof }), { ete: C.toitEte }),   // toit enneigé ou bardeaux
     eave: new THREE.MeshLambertMaterial({ color: C.eave }),
     stone: new THREE.MeshLambertMaterial({ color: C.stone }),
     door: new THREE.MeshLambertMaterial({ color: C.earthBot }),

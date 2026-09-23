@@ -2,7 +2,7 @@
 
 export const FORET = {
   /** Limite de la forêt (m), plus basse en ubac, avec des bords irréguliers. */
-  limite: 1950,
+  limite: 2250,
   ecartUbac: 170,
   irregularite: 140,
   /** Pas d'arbre au-delà de cette pente (%). */
